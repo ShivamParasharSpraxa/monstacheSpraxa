@@ -328,6 +328,7 @@ type configOptions struct {
 	NsExcludeRegex              string         `toml:"namespace-exclude-regex"`
 	NsDropExcludeRegex          string         `toml:"namespace-drop-exclude-regex"`
 	ClusterName                 string         `toml:"cluster-name"`
+	IndexDbPrefix               string         `toml:"index-db-prefix"`
 	Print                       bool           `toml:"print-config"`
 	Version                     bool
 	Pprof                       bool
@@ -1741,6 +1742,7 @@ func (config *configOptions) parseCommandLineFlags() *configOptions {
 	flag.StringVar(&config.MergePatchAttr, "merge-patch-attribute", "", "Attribute to store json-patch values under")
 	flag.StringVar(&config.ResumeName, "resume-name", "", "Name under which to load/store the resume state. Defaults to 'default'")
 	flag.StringVar(&config.ClusterName, "cluster-name", "", "Name of the monstache process cluster")
+	flag.StringVar(&config.IndexDbPrefix, "index-db-prefix", "", "Prefix to add fo Index")
 	flag.StringVar(&config.Worker, "worker", "", "The name of this worker in a multi-worker configuration")
 	flag.StringVar(&config.MapperPluginPath, "mapper-plugin-path", "", "The path to a .so file to load as a document mapper plugin")
 	flag.StringVar(&config.DirectReadExcludeRegex, "direct-read-dynamic-exclude-regex", "", "A regex to use for excluding namespaces when using dynamic direct reads")
@@ -1817,11 +1819,18 @@ func (config *configOptions) loadReplacements() {
 
 func (config *configOptions) loadIndexTypes() {
 	if config.Mapping != nil {
+		currentTime := time.Now()
+		currentYear := currentTime.Year()
+		indexDbPrefix := ""
+		if config.IndexDbPrefix != "" {
+			indexDbPrefix = config.IndexDbPrefix
+		}
 		for _, m := range config.Mapping {
 			if m.Namespace != "" && m.Index != "" {
+				infoLog.Printf("Namespace: %s mapped with Index: %s", m.Namespace, indexDbPrefix+"-"+strings.ToLower(m.Index)+"-"+strconv.Itoa(currentYear))
 				mapIndexTypes[m.Namespace] = &indexMapping{
 					Namespace: m.Namespace,
-					Index:     strings.ToLower(m.Index),
+					Index:     indexDbPrefix + "-" + strings.ToLower(m.Index) + "-" + strconv.Itoa(currentYear),
 				}
 			} else {
 				errorLog.Fatalln("Mappings must specify namespace and index")
@@ -2269,6 +2278,9 @@ func (config *configOptions) loadConfigFile() *configOptions {
 		}
 		if config.ClusterName == "" {
 			config.ClusterName = tomlConfig.ClusterName
+		}
+		if config.IndexDbPrefix == "" {
+			config.IndexDbPrefix = tomlConfig.IndexDbPrefix
 		}
 		if config.ResumeStrategy == 0 {
 			config.ResumeStrategy = tomlConfig.ResumeStrategy
